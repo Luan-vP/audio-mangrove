@@ -6,6 +6,20 @@
   <title>TechnoShamanism Tree Growth</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    button {
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
 </head>
 <body>
 <script>
@@ -23,7 +37,8 @@
     
     // Add a start button
     let startButton = createButton('Start Audio');
-    startButton.position(10, 10);
+    startButton.position(width / 2 - 50, height / 2 + 50);
+    startButton.size(100, 40);
     startButton.mousePressed(startAudio);
 
     textAlign(CENTER, CENTER);
@@ -126,6 +141,9 @@
       }
     });
   }
+
+  // This line ensures that p5.js will call setup() and draw()
+  new p5();
 </script>
 </body>
 </html>
