@@ -1,149 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TechnoShamanism Tree Growth</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
-  <style>
-    body { margin: 0; padding: 0; }
-    button {
-      font-size: 16px;
-      cursor: pointer;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-    }
-    button:hover {
-      background-color: #45a049;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Didgeridoo Tree Growth</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+    </style>
 </head>
 <body>
-<script>
-  let mic, fft;
-  let tree = [];
-  let baseThreshold = 200; // Hz, define low-frequency threshold
+    <script>
+        let mic, fft;
+        let tree = [];
+        let maxDepth = 8;
 
-  function setup() {
-    createCanvas(windowWidth, windowHeight);
-    background(0);
-    
-    // Create but don't start the audio input yet
-    mic = new p5.AudioIn();
-    fft = new p5.FFT(0.8, 64);
-    
-    // Add a start button
-    let startButton = createButton('Start Audio');
-    startButton.position(width / 2 - 50, height / 2 + 50);
-    startButton.size(100, 40);
-    startButton.mousePressed(startAudio);
-
-    textAlign(CENTER, CENTER);
-    fill(255);
-    textSize(16);
-    text('Click "Start Audio" and allow microphone access to begin', width/2, height/2);
-  }
-
-  function startAudio() {
-    userStartAudio();
-    mic.start();
-    fft.setInput(mic);
-  }
-
-  function draw() {
-    background(0, 50);
-    
-    if (mic && mic.enabled) {
-      let spectrum = fft.analyze();
-      let lowFreqEnergy = fft.getEnergy("bass");
-      let highFreqEnergy = fft.getEnergy("treble");
-
-      // Display the energy levels for debugging
-      displayEnergyLevels(lowFreqEnergy, highFreqEnergy);
-
-      // Grow roots if bass is strong
-      if (lowFreqEnergy > 100) {
-        growRoots();
-      }
-
-      // Grow branches and flowers if treble is strong
-      if (highFreqEnergy > 100) {
-        growBranches();
-        if (random(1) < 0.1) {
-          growFlowers();
+        function setup() {
+            createCanvas(800, 600);
+            mic = new p5.AudioIn();
+            mic.start();
+            fft = new p5.FFT();
+            fft.setInput(mic);
+            
+            // Start with a single branch
+            let root = new Branch(createVector(width/2, height), createVector(0, -1), 100);
+            tree.push(root);
         }
-      }
-    }
 
-    // Draw the tree
-    drawTree();
-  }
+        function draw() {
+            background(51);
+            
+            // Analyze the sound
+            fft.analyze();
+            let bass = fft.getEnergy("bass");
+            let treble = fft.getEnergy("treble");
+            
+            // Grow the tree based on sound
+            if (frameCount % 30 === 0) { // Grow every 30 frames
+                if (bass > 200) {
+                    growRoots();
+                }
+                if (treble > 200) {
+                    growBranches();
+                }
+            }
+            
+            // Draw the tree
+            stroke(255);
+            for (let branch of tree) {
+                branch.show();
+            }
+        }
 
-  function displayEnergyLevels(lowFreqEnergy, highFreqEnergy) {
-    fill(255);
-    noStroke();
-    textSize(16);
-    text("Bass Energy: " + lowFreqEnergy, 10, height - 30);
-    text("Treble Energy: " + highFreqEnergy, 10, height - 10);
-  }
+        function growRoots() {
+            for (let i = tree.length - 1; i >= 0; i--) {
+                if (tree[i].depth < maxDepth && random() < 0.3) {
+                    tree.push(tree[i].branch(PI/6));
+                    tree.push(tree[i].branch(-PI/6));
+                }
+            }
+        }
 
-  function growRoots() {
-    let root = {
-      x: width / 2,
-      y: height,
-      length: random(10, 20),
-      angle: PI/2 + random(-QUARTER_PI, QUARTER_PI)
-    };
-    tree.push(root);
-  }
+        function growBranches() {
+            for (let i = tree.length - 1; i >= 0; i--) {
+                if (tree[i].depth < maxDepth && random() < 0.3) {
+                    tree.push(tree[i].branch(PI/4));
+                    tree.push(tree[i].branch(-PI/4));
+                }
+            }
+        }
 
-  function growBranches() {
-    let branches = tree.filter(part => part.length < 50);
-    branches.forEach(branch => {
-      let newBranch = {
-        x: branch.x,
-        y: branch.y,
-        length: branch.length * 0.7,
-        angle: branch.angle + random(-QUARTER_PI, QUARTER_PI)
-      };
-      tree.push(newBranch);
-    });
-  }
-
-  function growFlowers() {
-    let flowers = tree.filter(part => part.length < 20);
-    flowers.forEach(flower => {
-      let newFlower = {
-        x: flower.x + cos(flower.angle) * flower.length,
-        y: flower.y + sin(flower.angle) * flower.length,
-        size: random(2, 5),
-        color: color(random(255), random(255), random(255))
-      };
-      tree.push(newFlower);
-    });
-  }
-
-  function drawTree() {
-    stroke(255);
-    tree.forEach(part => {
-      if (part.length) {
-        let endX = part.x + cos(part.angle) * part.length;
-        let endY = part.y + sin(part.angle) * part.length;
-        line(part.x, part.y, endX, endY);
-        part.length *= 0.99; // Slow down the shrinking
-      } else {
-        noStroke();
-        fill(part.color);
-        ellipse(part.x, part.y, part.size);
-      }
-    });
-  }
-
-  // This line ensures that p5.js will call setup() and draw()
-  new p5();
-</script>
+        class Branch {
+            constructor(begin, dir, len) {
+                this.begin = begin;
+                this.end = p5.Vector.add(begin, p5.Vector.mult(dir, len));
+                this.depth = 0;
+            }
+            
+            branch(angle) {
+                let dir = p5.Vector.sub(this.end, this.begin);
+                dir.rotate(angle);
+                dir.mult(0.67);
+                let newBranch = new Branch(this.end, dir, dir.mag());
+                newBranch.depth = this.depth + 1;
+                return newBranch;
+            }
+            
+            show() {
+                stroke(255, 100);
+                line(this.begin.x, this.begin.y, this.end.x, this.end.y);
+            }
+        }
+    </script>
 </body>
 </html>
