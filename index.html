@@ -15,32 +15,51 @@
 
   function setup() {
     createCanvas(windowWidth, windowHeight);
-    mic = new p5.AudioIn();
-    mic.start();
-    fft = new p5.FFT(0.8, 64); // Smoothness and bins
-    fft.setInput(mic);
     background(0);
+    
+    // Create but don't start the audio input yet
+    mic = new p5.AudioIn();
+    fft = new p5.FFT(0.8, 64);
+    
+    // Add a start button
+    let startButton = createButton('Start Audio');
+    startButton.position(10, 10);
+    startButton.mousePressed(startAudio);
+
+    textAlign(CENTER, CENTER);
+    fill(255);
+    textSize(16);
+    text('Click "Start Audio" and allow microphone access to begin', width/2, height/2);
+  }
+
+  function startAudio() {
+    userStartAudio();
+    mic.start();
+    fft.setInput(mic);
   }
 
   function draw() {
     background(0, 50);
-    let spectrum = fft.analyze();
-    let lowFreqEnergy = fft.getEnergy("bass");
-    let highFreqEnergy = fft.getEnergy("treble");
+    
+    if (mic && mic.enabled) {
+      let spectrum = fft.analyze();
+      let lowFreqEnergy = fft.getEnergy("bass");
+      let highFreqEnergy = fft.getEnergy("treble");
 
-    // Display the energy levels for debugging
-    displayEnergyLevels(lowFreqEnergy, highFreqEnergy);
+      // Display the energy levels for debugging
+      displayEnergyLevels(lowFreqEnergy, highFreqEnergy);
 
-    // Grow roots if bass is strong
-    if (lowFreqEnergy > 150) {
-      growRoots();
-    }
+      // Grow roots if bass is strong
+      if (lowFreqEnergy > 100) {
+        growRoots();
+      }
 
-    // Grow branches and flowers if treble is strong
-    if (highFreqEnergy > 150) {
-      growBranches();
-      if (random(1) < 0.1) {
-        growFlowers();
+      // Grow branches and flowers if treble is strong
+      if (highFreqEnergy > 100) {
+        growBranches();
+        if (random(1) < 0.1) {
+          growFlowers();
+        }
       }
     }
 
@@ -61,7 +80,7 @@
       x: width / 2,
       y: height,
       length: random(10, 20),
-      angle: PI + random(-QUARTER_PI, QUARTER_PI)
+      angle: PI/2 + random(-QUARTER_PI, QUARTER_PI)
     };
     tree.push(root);
   }
@@ -96,10 +115,10 @@
     stroke(255);
     tree.forEach(part => {
       if (part.length) {
-        line(part.x, part.y, part.x + cos(part.angle) * part.length, part.y + sin(part.angle) * part.length);
-        part.x += cos(part.angle) * part.length;
-        part.y += sin(part.angle) * part.length;
-        part.length *= 0.9; // reduce length for next iteration
+        let endX = part.x + cos(part.angle) * part.length;
+        let endY = part.y + sin(part.angle) * part.length;
+        line(part.x, part.y, endX, endY);
+        part.length *= 0.99; // Slow down the shrinking
       } else {
         noStroke();
         fill(part.color);
