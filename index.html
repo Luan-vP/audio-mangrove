@@ -37,10 +37,6 @@
             let canvas = createCanvas(800, 600);
             canvas.parent('canvasContainer');
             
-            // Initialize audio components but don't start them yet
-            mic = new p5.AudioIn();
-            fft = new p5.FFT();
-            
             // Start with a single branch
             let root = new Branch(createVector(width/2, height), createVector(0, -1), 100);
             tree.push(root);
@@ -50,6 +46,10 @@
         }
 
         function startAudio() {
+            // Initialize audio components only when the button is clicked
+            mic = new p5.AudioIn();
+            fft = new p5.FFT();
+            
             userStartAudio().then(() => {
                 mic.start();
                 fft.setInput(mic);
