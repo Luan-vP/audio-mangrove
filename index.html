@@ -11,46 +11,70 @@
             margin: 0;
             padding: 0;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             background-color: #f0f0f0;
         }
+        #startButton {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
+    <div id="canvasContainer"></div>
+    <button id="startButton">Start Audio Analysis</button>
     <script>
         let mic, fft;
         let tree = [];
         let maxDepth = 8;
+        let audioStarted = false;
 
         function setup() {
-            createCanvas(800, 600);
+            let canvas = createCanvas(800, 600);
+            canvas.parent('canvasContainer');
+            
+            // Initialize audio components but don't start them yet
             mic = new p5.AudioIn();
-            mic.start();
             fft = new p5.FFT();
-            fft.setInput(mic);
             
             // Start with a single branch
             let root = new Branch(createVector(width/2, height), createVector(0, -1), 100);
             tree.push(root);
+
+            // Add click listener to the start button
+            document.getElementById('startButton').addEventListener('click', startAudio);
+        }
+
+        function startAudio() {
+            userStartAudio().then(() => {
+                mic.start();
+                fft.setInput(mic);
+                audioStarted = true;
+                document.getElementById('startButton').style.display = 'none';
+            });
         }
 
         function draw() {
             background(51);
             
-            // Analyze the sound
-            fft.analyze();
-            let bass = fft.getEnergy("bass");
-            let treble = fft.getEnergy("treble");
-            
-            // Grow the tree based on sound
-            if (frameCount % 30 === 0) { // Grow every 30 frames
-                if (bass > 200) {
-                    growRoots();
-                }
-                if (treble > 200) {
-                    growBranches();
+            if (audioStarted) {
+                // Analyze the sound
+                fft.analyze();
+                let bass = fft.getEnergy("bass");
+                let treble = fft.getEnergy("treble");
+                
+                // Grow the tree based on sound
+                if (frameCount % 30 === 0) { // Grow every 30 frames
+                    if (bass > 200) {
+                        growRoots();
+                    }
+                    if (treble > 200) {
+                        growBranches();
+                    }
                 }
             }
             
