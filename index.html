@@ -3,126 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Didgeridoo Tree Growth</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <title>Sound Reactive Tree</title>
     <style>
         body {
             margin: 0;
-            padding: 0;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #f0f0f0;
+            background-color: #000;
         }
-        #startButton {
-            font-size: 18px;
-            padding: 10px 20px;
-            margin-top: 20px;
+        canvas {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <div id="canvasContainer"></div>
-    <button id="startButton">Start Audio Analysis</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
         let mic, fft;
-        let tree = [];
-        let maxDepth = 8;
-        let audioStarted = false;
 
         function setup() {
-            let canvas = createCanvas(800, 600);
-            canvas.parent('canvasContainer');
-            
-            // Start with a single branch
-            let root = new Branch(createVector(width/2, height), createVector(0, -1), 100);
-            tree.push(root);
-
-            // Add click listener to the start button
-            document.getElementById('startButton').addEventListener('click', startAudio);
-        }
-
-        function startAudio() {
-            // Initialize audio components only when the button is clicked
+            createCanvas(windowWidth, windowHeight);
             mic = new p5.AudioIn();
+            mic.start();
             fft = new p5.FFT();
-            
-            userStartAudio().then(() => {
-                mic.start();
-                fft.setInput(mic);
-                audioStarted = true;
-                document.getElementById('startButton').style.display = 'none';
-            });
+            fft.setInput(mic);
+            noFill();
         }
 
         function draw() {
-            background(51);
-            
-            if (audioStarted) {
-                // Analyze the sound
-                fft.analyze();
-                let bass = fft.getEnergy("bass");
-                let treble = fft.getEnergy("treble");
-                
-                // Grow the tree based on sound
-                if (frameCount % 30 === 0) { // Grow every 30 frames
-                    if (bass > 200) {
-                        growRoots();
-                    }
-                    if (treble > 200) {
-                        growBranches();
-                    }
-                }
-            }
-            
-            // Draw the tree
+            background(0);
+            let spectrum = fft.analyze();
+            let lowFreq = fft.getEnergy("bass", "lowMid");
+            let highFreq = fft.getEnergy("highMid", "treble");
+
+            translate(width / 2, height);
             stroke(255);
-            for (let branch of tree) {
-                branch.show();
-            }
+            drawBranch(100, lowFreq, highFreq);
         }
 
-        function growRoots() {
-            for (let i = tree.length - 1; i >= 0; i--) {
-                if (tree[i].depth < maxDepth && random() < 0.3) {
-                    tree.push(tree[i].branch(PI/6));
-                    tree.push(tree[i].branch(-PI/6));
+        function drawBranch(len, lowFreq, highFreq) {
+            if (len > 4) {
+                let sw = map(len, 2, 100, 1, 10);
+                strokeWeight(sw);
+                line(0, 0, 0, -len);
+                translate(0, -len);
+
+                if (lowFreq > highFreq) {
+                    push();
+                    rotate(PI / 6);
+                    drawBranch(len * 0.67, lowFreq, highFreq);
+                    pop();
+
+                    push();
+                    rotate(-PI / 6);
+                    drawBranch(len * 0.67, lowFreq, highFreq);
+                    pop();
+                } else {
+                    push();
+                    rotate(PI / 4);
+                    drawBranch(len * 0.67, lowFreq, highFreq);
+                    pop();
+
+                    push();
+                    rotate(-PI / 4);
+                    drawBranch(len * 0.67, lowFreq, highFreq);
+                    pop();
                 }
             }
         }
 
-        function growBranches() {
-            for (let i = tree.length - 1; i >= 0; i--) {
-                if (tree[i].depth < maxDepth && random() < 0.3) {
-                    tree.push(tree[i].branch(PI/4));
-                    tree.push(tree[i].branch(-PI/4));
-                }
-            }
-        }
-
-        class Branch {
-            constructor(begin, dir, len) {
-                this.begin = begin;
-                this.end = p5.Vector.add(begin, p5.Vector.mult(dir, len));
-                this.depth = 0;
-            }
-            
-            branch(angle) {
-                let dir = p5.Vector.sub(this.end, this.begin);
-                dir.rotate(angle);
-                dir.mult(0.67);
-                let newBranch = new Branch(this.end, dir, dir.mag());
-                newBranch.depth = this.depth + 1;
-                return newBranch;
-            }
-            
-            show() {
-                stroke(255, 100);
-                line(this.begin.x, this.begin.y, this.end.x, this.end.y);
-            }
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
         }
     </script>
 </body>
