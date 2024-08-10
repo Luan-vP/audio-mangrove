@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sound Reactive Tree</title>
+    <title>Sound Reactive Swaying Tree</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
     <style>
@@ -37,11 +37,12 @@
 </head>
 <body>
     <div id="instructions">
-        <h2>Sound Reactive Tree</h2>
+        <h2>Sound Reactive Swaying Tree</h2>
         <p>Click "Start" and allow microphone access. Make sounds or play music:</p>
         <ul>
             <li>Low frequencies grow roots</li>
             <li>High frequencies grow branches</li>
+            <li>The tree sways in the wind</li>
         </ul>
     </div>
     <button id="startButton">Start</button>
@@ -50,6 +51,8 @@
         let isSetup = false;
         let lowThreshold, highThreshold;
         const MAX_DEPTH = 8;
+        let time = 0;
+        let windAngle = 0;
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
@@ -98,7 +101,11 @@
                 tree.growBranches();
             }
 
-            tree.show();
+            // Update wind angle
+            time += 0.05;
+            windAngle = sin(time) * 0.05;
+
+            tree.show(windAngle);
 
             lowThreshold = lerp(lowThreshold, lowEnergy, 0.01);
             highThreshold = lerp(highThreshold, highEnergy, 0.01);
@@ -107,6 +114,7 @@
         class Tree {
             constructor(x, y, angle, dir, len, depth) {
                 this.pos = createVector(x, y);
+                this.originalAngle = angle;
                 this.dir = createVector(cos(angle), sin(angle));
                 this.dir.mult(dir);
                 this.len = len;
@@ -168,22 +176,26 @@
                 }
             }
 
-            show() {
+            show(windAngle) {
+                let swayFactor = map(this.depth, 0, MAX_DEPTH, 1, 0.1);
+                let currentAngle = this.originalAngle + windAngle * swayFactor;
+                let swayedDir = p5.Vector.fromAngle(currentAngle).mult(this.dir.mag());
+
                 stroke(70, 40, 20);
                 strokeWeight(this.thickness);
                 line(
                     this.pos.x,
                     this.pos.y,
-                    this.pos.x + this.dir.x * this.len,
-                    this.pos.y + this.dir.y * this.len
+                    this.pos.x + swayedDir.x * this.len,
+                    this.pos.y + swayedDir.y * this.len
                 );
 
                 for (let branch of this.branches) {
-                    branch.show();
+                    branch.show(windAngle);
                 }
 
                 for (let root of this.roots) {
-                    root.show();
+                    root.show(windAngle * 0.2); // Roots sway less
                 }
             }
         }
