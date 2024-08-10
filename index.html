@@ -4,80 +4,202 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sound Reactive Tree</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
     <style>
         body {
             margin: 0;
+            padding: 0;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #000;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
         }
-        canvas {
-            display: block;
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 300px;
+        }
+        #startButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <div id="instructions">
+        <h2>Sound Reactive Tree</h2>
+        <p>Click "Start" and allow microphone access. Make sounds or play music:</p>
+        <ul>
+            <li>Low frequencies grow roots</li>
+            <li>High frequencies grow branches</li>
+        </ul>
+    </div>
+    <button id="startButton">Start</button>
     <script>
-        let mic, fft;
+        let mic, fft, tree;
+        let isSetup = false;
+        let lowThreshold, highThreshold;
+        const MAX_DEPTH = 8;
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            mic = new p5.AudioIn();
-            mic.start();
-            fft = new p5.FFT();
-            fft.setInput(mic);
-            noFill();
+            noLoop();
+            
+            document.getElementById('startButton').addEventListener('click', startApp);
+        }
+
+        function startApp() {
+            if (isSetup) return;
+            
+            userStartAudio().then(() => {
+                mic = new p5.AudioIn();
+                mic.start();
+                fft = new p5.FFT();
+                fft.setInput(mic);
+
+                tree = new Tree(width / 2, height, 0, -1, 100, 0);
+                
+                lowThreshold = 130;
+                highThreshold = 200;
+
+                isSetup = true;
+                loop();
+                document.getElementById('startButton').style.display = 'none';
+            }).catch(error => {
+                console.error('Error starting audio:', error);
+                alert('Failed to access the microphone. Please ensure you have given permission and try again.');
+            });
         }
 
         function draw() {
-            background(0);
-            let spectrum = fft.analyze();
-            let lowFreq = fft.getEnergy("bass", "lowMid");
-            let highFreq = fft.getEnergy("highMid", "treble");
+            if (!isSetup) return;
 
-            translate(width / 2, height);
-            stroke(255);
-            drawBranch(100, lowFreq, highFreq);
+            background(240);
+
+            let spectrum = fft.analyze();
+            let lowEnergy = fft.getEnergy("bass");
+            let highEnergy = fft.getEnergy("treble");
+
+            if (lowEnergy > lowThreshold) {
+                tree.growRoots();
+            }
+
+            if (highEnergy > highThreshold) {
+                tree.growBranches();
+            }
+
+            tree.show();
+
+            lowThreshold = lerp(lowThreshold, lowEnergy, 0.01);
+            highThreshold = lerp(highThreshold, highEnergy, 0.01);
         }
 
-        function drawBranch(len, lowFreq, highFreq) {
-            if (len > 4) {
-                let sw = map(len, 2, 100, 1, 10);
-                strokeWeight(sw);
-                line(0, 0, 0, -len);
-                translate(0, -len);
+        class Tree {
+            constructor(x, y, angle, dir, len, depth) {
+                this.pos = createVector(x, y);
+                this.dir = createVector(cos(angle), sin(angle));
+                this.dir.mult(dir);
+                this.len = len;
+                this.branches = [];
+                this.roots = [];
+                this.thickness = map(len, 0, 100, 1, 10);
+                this.depth = depth;
+            }
 
-                if (lowFreq > highFreq) {
-                    push();
-                    rotate(PI / 6);
-                    drawBranch(len * 0.67, lowFreq, highFreq);
-                    pop();
-
-                    push();
-                    rotate(-PI / 6);
-                    drawBranch(len * 0.67, lowFreq, highFreq);
-                    pop();
+            growBranches() {
+                if (this.branches.length === 0 && this.depth < MAX_DEPTH) {
+                    let newBranch1 = new Tree(
+                        this.pos.x + this.dir.x * this.len,
+                        this.pos.y + this.dir.y * this.len,
+                        this.dir.heading() - PI / 6,
+                        1,
+                        this.len * 0.67,
+                        this.depth + 1
+                    );
+                    let newBranch2 = new Tree(
+                        this.pos.x + this.dir.x * this.len,
+                        this.pos.y + this.dir.y * this.len,
+                        this.dir.heading() + PI / 6,
+                        1,
+                        this.len * 0.67,
+                        this.depth + 1
+                    );
+                    this.branches.push(newBranch1, newBranch2);
                 } else {
-                    push();
-                    rotate(PI / 4);
-                    drawBranch(len * 0.67, lowFreq, highFreq);
-                    pop();
+                    for (let branch of this.branches) {
+                        branch.growBranches();
+                    }
+                }
+            }
 
-                    push();
-                    rotate(-PI / 4);
-                    drawBranch(len * 0.67, lowFreq, highFreq);
-                    pop();
+            growRoots() {
+                if (this.roots.length === 0 && this.depth < MAX_DEPTH) {
+                    let newRoot1 = new Tree(
+                        this.pos.x,
+                        this.pos.y,
+                        this.dir.heading() - PI / 4,
+                        -1,
+                        this.len * 0.67,
+                        this.depth + 1
+                    );
+                    let newRoot2 = new Tree(
+                        this.pos.x,
+                        this.pos.y,
+                        this.dir.heading() + PI / 4,
+                        -1,
+                        this.len * 0.67,
+                        this.depth + 1
+                    );
+                    this.roots.push(newRoot1, newRoot2);
+                } else {
+                    for (let root of this.roots) {
+                        root.growRoots();
+                    }
+                }
+            }
+
+            show() {
+                stroke(70, 40, 20);
+                strokeWeight(this.thickness);
+                line(
+                    this.pos.x,
+                    this.pos.y,
+                    this.pos.x + this.dir.x * this.len,
+                    this.pos.y + this.dir.y * this.len
+                );
+
+                for (let branch of this.branches) {
+                    branch.show();
+                }
+
+                for (let root of this.roots) {
+                    root.show();
                 }
             }
         }
 
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
+            if (isSetup) {
+                tree = new Tree(width / 2, height, 0, -1, 100, 0);
+            }
         }
+
+        window.addEventListener('beforeunload', () => {
+            if (mic) {
+                mic.stop();
+            }
+        });
     </script>
 </body>
 </html>
