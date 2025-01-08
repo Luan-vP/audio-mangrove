@@ -1,217 +1,83 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sound Reactive Swaying Tree</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
-        }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background-color: rgba(255, 255, 255, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            max-width: 300px;
-        }
-        #startButton {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Circuit Board</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
 </head>
 <body>
-    <div id="instructions">
-        <h2>Sound Reactive Swaying Tree</h2>
-        <p>Click "Start" and allow microphone access. Make sounds or play music:</p>
-        <ul>
-            <li>Low frequencies grow roots</li>
-            <li>High frequencies grow branches</li>
-            <li>The tree sways in the wind</li>
-        </ul>
-    </div>
-    <button id="startButton">Start</button>
-    <script>
-        let mic, fft, tree;
-        let isSetup = false;
-        let lowThreshold, highThreshold;
-        const MAX_DEPTH = 8;
-        let time = 0;
-        let windAngle = 0;
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js';
 
-        function setup() {
-            createCanvas(windowWidth, windowHeight);
-            noLoop();
-            
-            document.getElementById('startButton').addEventListener('click', startApp);
-        }
+  // Scene, Camera, Renderer
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-        function startApp() {
-            if (isSetup) return;
-            
-            userStartAudio().then(() => {
-                mic = new p5.AudioIn();
-                mic.start();
-                fft = new p5.FFT();
-                fft.setInput(mic);
+  // Lighting
+  const ambientLight = new THREE.AmbientLight(0x404040, 2); // soft light
+  scene.add(ambientLight);
 
-                tree = new Tree(width / 2, height, 0, -1, 100, 0);
-                
-                lowThreshold = 130;
-                highThreshold = 200;
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight.position.set(5, 10, 7.5);
+  scene.add(directionalLight);
 
-                isSetup = true;
-                loop();
-                document.getElementById('startButton').style.display = 'none';
-            }).catch(error => {
-                console.error('Error starting audio:', error);
-                alert('Failed to access the microphone. Please ensure you have given permission and try again.');
-            });
-        }
+  // Circuit Board Geometry
+  const boardGeometry = new THREE.BoxGeometry(4, 0.2, 3);
+  const boardMaterial = new THREE.MeshPhongMaterial({ color: 0x2c8f2c });
+  const circuitBoard = new THREE.Mesh(boardGeometry, boardMaterial);
+  scene.add(circuitBoard);
 
-        function draw() {
-            if (!isSetup) return;
+  // Adding "chips" on the circuit board
+  const chipGeometry = new THREE.BoxGeometry(0.6, 0.2, 0.6);
+  const chipMaterial = new THREE.MeshPhongMaterial({ color: 0x222222 });
+  for (let i = 0; i < 6; i++) {
+    const chip = new THREE.Mesh(chipGeometry, chipMaterial);
+    chip.position.set(
+      (Math.random() - 0.5) * 3.5,
+      0.2,
+      (Math.random() - 0.5) * 2.5
+    );
+    circuitBoard.add(chip);
+  }
 
-            background(240);
+  // Camera Position
+  camera.position.z = 6;
 
-            let spectrum = fft.analyze();
-            let lowEnergy = fft.getEnergy("bass");
-            let highEnergy = fft.getEnergy("treble");
+  // Orbit Controls for rotation
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; // Smooth rotation
+  controls.dampingFactor = 0.05;
+  controls.enableZoom = false;
 
-            if (lowEnergy > lowThreshold) {
-                tree.growRoots();
-            }
+  // Responsive Design
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 
-            if (highEnergy > highThreshold) {
-                tree.growBranches();
-            }
+  // Animation Loop
+  const animate = function () {
+    requestAnimationFrame(animate);
+    controls.update(); // Update orbit controls
+    renderer.render(scene, camera);
+  };
 
-            // Update wind angle
-            time += 0.05;
-            windAngle = sin(time) * 0.05;
-
-            tree.show(windAngle);
-
-            lowThreshold = lerp(lowThreshold, lowEnergy, 0.01);
-            highThreshold = lerp(highThreshold, highEnergy, 0.01);
-        }
-
-        class Tree {
-            constructor(x, y, angle, dir, len, depth) {
-                this.pos = createVector(x, y);
-                this.originalAngle = angle;
-                this.dir = createVector(cos(angle), sin(angle));
-                this.dir.mult(dir);
-                this.len = len;
-                this.branches = [];
-                this.roots = [];
-                this.thickness = map(len, 0, 100, 1, 10);
-                this.depth = depth;
-            }
-
-            growBranches() {
-                if (this.branches.length === 0 && this.depth < MAX_DEPTH) {
-                    let newBranch1 = new Tree(
-                        this.pos.x + this.dir.x * this.len,
-                        this.pos.y + this.dir.y * this.len,
-                        this.dir.heading() - PI / 6,
-                        1,
-                        this.len * 0.67,
-                        this.depth + 1
-                    );
-                    let newBranch2 = new Tree(
-                        this.pos.x + this.dir.x * this.len,
-                        this.pos.y + this.dir.y * this.len,
-                        this.dir.heading() + PI / 6,
-                        1,
-                        this.len * 0.67,
-                        this.depth + 1
-                    );
-                    this.branches.push(newBranch1, newBranch2);
-                } else {
-                    for (let branch of this.branches) {
-                        branch.growBranches();
-                    }
-                }
-            }
-
-            growRoots() {
-                if (this.roots.length === 0 && this.depth < MAX_DEPTH) {
-                    let newRoot1 = new Tree(
-                        this.pos.x,
-                        this.pos.y,
-                        this.dir.heading() - PI / 4,
-                        -1,
-                        this.len * 0.67,
-                        this.depth + 1
-                    );
-                    let newRoot2 = new Tree(
-                        this.pos.x,
-                        this.pos.y,
-                        this.dir.heading() + PI / 4,
-                        -1,
-                        this.len * 0.67,
-                        this.depth + 1
-                    );
-                    this.roots.push(newRoot1, newRoot2);
-                } else {
-                    for (let root of this.roots) {
-                        root.growRoots();
-                    }
-                }
-            }
-
-            show(windAngle) {
-                let swayFactor = map(this.depth, 0, MAX_DEPTH, 1, 0.1);
-                let currentAngle = this.originalAngle + windAngle * swayFactor;
-                let swayedDir = p5.Vector.fromAngle(currentAngle).mult(this.dir.mag());
-
-                stroke(70, 40, 20);
-                strokeWeight(this.thickness);
-                line(
-                    this.pos.x,
-                    this.pos.y,
-                    this.pos.x + swayedDir.x * this.len,
-                    this.pos.y + swayedDir.y * this.len
-                );
-
-                for (let branch of this.branches) {
-                    branch.show(windAngle);
-                }
-
-                for (let root of this.roots) {
-                    root.show(windAngle * 0.2); // Roots sway less
-                }
-            }
-        }
-
-        function windowResized() {
-            resizeCanvas(windowWidth, windowHeight);
-            if (isSetup) {
-                tree = new Tree(width / 2, height, 0, -1, 100, 0);
-            }
-        }
-
-        window.addEventListener('beforeunload', () => {
-            if (mic) {
-                mic.stop();
-            }
-        });
-    </script>
+  animate();
+</script>
 </body>
 </html>
